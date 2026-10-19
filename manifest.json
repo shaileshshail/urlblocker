@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "URL Blocker",
+  "version": "1.2.0",
+  "description": "Blocks URLs matching your patterns on every tab and every URL change, including single-page-app routes.",
+  "permissions": ["tabs", "webNavigation", "storage", "declarativeNetRequest"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" },
+  "options_page": "options.html",
+  "action": { "default_popup": "options.html" }
+}

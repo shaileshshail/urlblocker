@@ -1,0 +1,114 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>URL Blocker</title>
+  <style>
+    :root {
+      --bg: #ffffff; --surface: #f5f6f8; --border: #dfe2e7; --text: #1d2129; --muted: #6b7280;
+      --accent: #d93025; --accent-hover: #b3261e; --ok: #188038; --warn: #b06000; --chip: #e8eaed;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1f2023; --surface: #2a2b2f; --border: #3c3d42; --text: #e8eaed; --muted: #9aa0a6;
+        --accent: #f28b82; --accent-hover: #f6aea9; --ok: #81c995; --warn: #fdd663; --chip: #3c3d42;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; min-width: 380px; }
+    .wrap { max-width: 640px; margin: 0 auto; padding: 16px; }
+    header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    header h1 { font-size: 17px; margin: 0; flex: 1; }
+    .count { font-size: 12px; color: var(--muted); background: var(--chip); padding: 2px 8px; border-radius: 10px; }
+
+    button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 8px 12px; }
+    button:hover { border-color: var(--muted); }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+    @media (prefers-color-scheme: dark) { button.primary { color: #1f2023; } }
+    button.primary:hover { background: var(--accent-hover); }
+    button:disabled { opacity: .5; cursor: default; }
+
+    .current { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); margin-bottom: 14px; }
+    .current .host { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .current .host small { display: block; color: var(--muted); font-size: 12px; }
+    .current[hidden] { display: none; }
+
+    .add { display: flex; gap: 8px; }
+    input[type=text] { flex: 1; min-width: 0; font: 13px/1.4 ui-monospace, Consolas, monospace; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+    input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+    .hint { font-size: 12px; color: var(--muted); margin: 6px 2px 14px; min-height: 17px; }
+    .hint.err { color: var(--accent); }
+    .hint.ok { color: var(--ok); }
+    code { font-family: ui-monospace, Consolas, monospace; font-size: 12px; background: var(--chip); padding: 1px 5px; border-radius: 4px; }
+
+    ul { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    li { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 12px; border-top: 1px solid var(--border); }
+    li:first-child { border-top: 0; }
+    li.hit { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+    li .pat { flex: 1; min-width: 0; font: 13px ui-monospace, Consolas, monospace; word-break: break-all; }
+    li .tag { font-size: 11px; color: var(--muted); background: var(--chip); padding: 1px 6px; border-radius: 4px; }
+    li .tag.bad { color: var(--accent); }
+    li button { padding: 4px 8px; border: 0; background: transparent; color: var(--muted); font-size: 16px; line-height: 1; }
+    li button:hover { color: var(--accent); }
+    li.builtin { background: var(--surface); }
+    li .lock { padding: 4px 8px; font-size: 13px; opacity: .7; cursor: help; }
+    .empty { text-align: center; color: var(--muted); padding: 24px 12px; border: 1px dashed var(--border); border-radius: 10px; }
+
+    details { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
+    summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+    details .body { margin-top: 10px; }
+    .help { font-size: 13px; color: var(--muted); }
+    .help li { border: 0; padding: 3px 0; display: list-item; }
+    .help ul { border: 0; padding-left: 18px; list-style: disc; }
+    .toast { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>🚫 URL Blocker</h1>
+      <span class="count" id="count">0 patterns</span>
+    </header>
+
+    <div class="current" id="current" hidden>
+      <div class="host"><small>Current site</small><span id="currentHost"></span></div>
+      <button class="primary" id="blockCurrent">Block this site</button>
+    </div>
+
+    <form class="add" id="addForm">
+      <input type="text" id="newPattern" placeholder="e.g. *reddit.com*  or  /^https:\/\/x\.com/" autocomplete="off" spellcheck="false">
+      <button class="primary" type="submit" id="addBtn">Add</button>
+    </form>
+    <div class="hint" id="hint">Use <code>*</code> as a wildcard. Press Enter to add.</div>
+
+    <ul id="list"></ul>
+    <div class="empty" id="empty">Nothing blocked yet. Add a pattern above.</div>
+
+    <details>
+      <summary>Test a URL</summary>
+      <div class="body">
+        <input type="text" id="testUrl" placeholder="Paste a URL to see if it would be blocked" spellcheck="false" style="width:100%">
+        <div class="hint" id="testResult"></div>
+      </div>
+    </details>
+
+    <details>
+      <summary>How patterns work</summary>
+      <div class="body help">
+        <ul>
+          <li><code>reddit.com</code> blocks any URL containing “reddit.com”.</li>
+          <li><code>*youtube.com/shorts*</code> blocks only YouTube Shorts. <code>*</code> matches anything.</li>
+          <li><code>/^https?:\/\/(www\.)?x\.com\//</code> is a regular expression (wrap it in slashes, add <code>i</code> after the last slash to ignore case).</li>
+          <li>Matching is case-insensitive for wildcards and checks the whole URL, including the path and query.</li>
+          <li>Blocks apply immediately to every tab, including in-app navigation on sites like YouTube or Twitter.</li>
+        </ul>
+      </div>
+    </details>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script src="patterns.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
